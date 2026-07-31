@@ -1,0 +1,481 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>furnax | Controle de Pendências</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800&family=Inter:wght@300;400;500;600;700&display=swap');
+
+  :root {
+    --bg: #08111f;
+    --surface: #0d1b2e;
+    --surface2: #112240;
+    --border: #1a3a5c;
+    --text: #e8f0fa;
+    --muted: #7a9bbf;
+    --accent: #0077cc;
+    --header-h: 56px;
+
+    --c-disp:    #f59e0b;
+    --c-pecas:   #ef4444;
+    --c-cliente: #8b5cf6;
+    --c-andamento: #22c55e;
+    --c-agendado: #0099ff;
+    --c-other:   #475569;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: 'Inter', sans-serif; background: var(--bg); color: var(--text);
+    height: 100vh; display: flex; flex-direction: column; overflow: hidden; }
+
+  /* ── TOP NAV ── */
+  .topnav {
+    height: var(--header-h); flex-shrink: 0;
+    background: linear-gradient(90deg, #061120 0%, #0a1e35 100%);
+    border-bottom: 1px solid var(--border);
+    display: flex; align-items: center; padding: 0 20px; gap: 14px; z-index: 100;
+  }
+  .logo svg { height: 32px; }
+  .divider { width: 1px; height: 26px; background: var(--border); }
+  .nav-title { font-size: 12px; font-weight: 500; color: var(--muted); letter-spacing: 0.06em; text-transform: uppercase; }
+  .spacer { flex: 1; }
+  .nav-badge {
+    font-size: 11px; font-weight: 600; padding: 3px 10px; border-radius: 10px;
+    background: rgba(0,119,204,0.15); border: 1px solid rgba(0,119,204,0.3); color: #4db3ff;
+    display: flex; align-items: center; gap: 5px;
+  }
+  .nav-badge.ok::before { content: '●'; font-size: 8px; animation: pulse 2s infinite; }
+  @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.3} }
+  .nav-btn {
+    background: transparent; border: 1px solid var(--border); color: var(--muted);
+    padding: 5px 12px; border-radius: 6px; cursor: pointer; font-size: 12px;
+    font-family: 'Inter', sans-serif; transition: all 0.15s;
+  }
+  .nav-btn:hover { border-color: var(--accent); color: var(--accent); }
+  .nav-date { font-size: 11px; color: var(--muted); text-align: right; line-height: 1.5; }
+  .nav-date strong { color: var(--text); display: block; font-size: 12px; }
+
+  /* ── KPI BAR ── */
+  .kpi-bar {
+    display: flex; gap: 8px; padding: 12px 20px; flex-shrink: 0;
+    background: var(--surface); border-bottom: 1px solid var(--border); flex-wrap: wrap;
+  }
+  .kpi-chip {
+    display: flex; align-items: center; gap: 7px; padding: 6px 14px;
+    background: var(--surface2); border: 1px solid var(--border); border-radius: 8px;
+    cursor: pointer; transition: all 0.15s; border-left: 3px solid var(--c);
+  }
+  .kpi-chip:hover, .kpi-chip.active { background: rgba(0,119,204,0.1); border-color: var(--c); }
+  .kpi-chip.active { border-left-color: var(--c); }
+  .kpi-num { font-size: 18px; font-weight: 800; color: var(--c); line-height: 1; }
+  .kpi-lbl { font-size: 11px; color: var(--muted); }
+  .search-wrap { margin-left: auto; display: flex; align-items: center; gap: 8px; }
+  .search-input {
+    background: var(--surface2); border: 1px solid var(--border); color: var(--text);
+    padding: 6px 12px; border-radius: 6px; font-size: 12px; font-family: 'Inter', sans-serif;
+    width: 220px;
+  }
+  .search-input::placeholder { color: var(--muted); }
+  .search-input:focus { outline: none; border-color: var(--accent); }
+
+  /* ── KANBAN ── */
+  .kanban-wrap { flex: 1; overflow-x: auto; overflow-y: hidden; padding: 16px 20px 20px; }
+  .kanban { display: flex; gap: 14px; height: 100%; min-width: max-content; }
+
+  .column {
+    width: 300px; flex-shrink: 0; display: flex; flex-direction: column;
+    background: var(--surface); border-radius: 12px; border: 1px solid var(--border);
+    overflow: hidden;
+  }
+  .col-header {
+    padding: 12px 14px; display: flex; align-items: center; gap: 8px;
+    border-bottom: 1px solid var(--border); border-top: 3px solid var(--c);
+    flex-shrink: 0;
+  }
+  .col-title { font-size: 12px; font-weight: 700; color: var(--text); text-transform: uppercase; letter-spacing: 0.06em; flex: 1; }
+  .col-count {
+    font-size: 11px; font-weight: 700; padding: 2px 8px; border-radius: 8px;
+    background: color-mix(in srgb, var(--c) 15%, transparent); color: var(--c);
+  }
+  .col-body { flex: 1; overflow-y: auto; padding: 10px; display: flex; flex-direction: column; gap: 8px; }
+
+  /* ── CARD ── */
+  .card {
+    background: var(--surface2); border: 1px solid var(--border); border-radius: 8px;
+    padding: 12px; transition: border-color 0.15s, transform 0.1s;
+    cursor: default; border-left: 3px solid var(--c);
+  }
+  .card:hover { border-color: var(--c); transform: translateY(-1px); }
+
+  .card-cliente { font-size: 13px; font-weight: 700; color: var(--text); margin-bottom: 6px; line-height: 1.3; }
+  .card-row { display: flex; align-items: center; gap: 6px; margin-bottom: 4px; }
+  .card-icon { font-size: 10px; color: var(--muted); width: 14px; flex-shrink: 0; }
+  .card-val { font-size: 11px; color: var(--muted); flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .card-tags { display: flex; gap: 5px; flex-wrap: wrap; margin-top: 8px; }
+  .card-tag {
+    font-size: 10px; font-weight: 600; padding: 2px 7px; border-radius: 5px;
+  }
+  .tag-motivo { background: rgba(0,119,204,0.15); color: #4db3ff; }
+  .tag-data { background: rgba(255,255,255,0.06); color: var(--muted); }
+  .tag-atraso { background: rgba(239,68,68,0.15); color: #fca5a5; }
+  .tag-hoje { background: rgba(34,197,94,0.15); color: #86efac; }
+
+  .col-empty { text-align: center; padding: 30px 10px; color: var(--border); font-size: 12px; }
+
+  /* ── CONFIG PANEL ── */
+  .config-panel {
+    position: fixed; right: 0; top: var(--header-h); width: 300px;
+    height: calc(100vh - var(--header-h)); background: var(--surface);
+    border-left: 1px solid var(--border); z-index: 200; padding: 20px;
+    transform: translateX(100%); transition: transform 0.3s; overflow-y: auto;
+  }
+  .config-panel.open { transform: translateX(0); }
+  .config-title { font-size: 14px; font-weight: 700; margin-bottom: 16px; }
+  .config-label { font-size: 11px; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: 0.07em; margin-bottom: 6px; }
+  .config-input {
+    width: 100%; background: var(--surface2); border: 1px solid var(--border); color: var(--text);
+    padding: 8px 10px; border-radius: 6px; font-size: 12px; font-family: 'Inter', sans-serif; margin-bottom: 14px;
+  }
+  .config-input:focus { outline: none; border-color: var(--accent); }
+  .config-btn { width: 100%; background: #0077cc; border: none; color: #fff; padding: 10px; border-radius: 8px; cursor: pointer; font-size: 13px; font-weight: 600; font-family: 'Inter', sans-serif; }
+  .config-close { position: absolute; top: 16px; right: 16px; background: none; border: none; color: var(--muted); cursor: pointer; font-size: 18px; }
+  .config-divider { border: none; border-top: 1px solid var(--border); margin: 16px 0; }
+  .config-status { font-size: 12px; color: var(--muted); }
+  .config-info { font-size: 11px; color: var(--muted); line-height: 1.7; }
+
+  ::-webkit-scrollbar { width: 5px; height: 5px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+
+  @media (max-width: 768px) {
+    .kpi-bar { padding: 8px 12px; gap: 6px; }
+    .kpi-chip { padding: 5px 10px; }
+    .kanban-wrap { padding: 10px 12px 16px; }
+    .column { width: 260px; }
+    .search-wrap { margin-left: 0; width: 100%; }
+    .search-input { width: 100%; }
+  }
+</style>
+</head>
+<body>
+
+<!-- TOP NAV -->
+<div class="topnav">
+  <div class="logo">
+    <svg width="110" height="32" viewBox="0 0 110 32" fill="none">
+      <text x="0" y="25" font-family="'Nunito','Inter',sans-serif" font-weight="700" font-size="25" fill="#fff">furnax</text>
+    </svg>
+  </div>
+  <div class="divider"></div>
+  <div class="nav-title">Controle de Pendências</div>
+  <div class="spacer"></div>
+  <div class="nav-badge" id="nav-badge">Carregando...</div>
+  <button class="nav-btn" onclick="loadData()">↻ Atualizar</button>
+  <button class="nav-btn" onclick="toggleConfig()">⚙ Config</button>
+  <div class="nav-date">
+    <strong id="current-date"></strong>
+    2026
+  </div>
+</div>
+
+<!-- KPI BAR -->
+<div class="kpi-bar">
+  <div class="kpi-chip" style="--c:var(--muted)" onclick="setFilter('')" id="chip-all">
+    <div class="kpi-num" id="kpi-total">0</div>
+    <div class="kpi-lbl">Total</div>
+  </div>
+  <div class="kpi-chip" style="--c:var(--c-disp)" onclick="setFilter('AGUARDANDO DISPONIBILIDADE')" id="chip-disp">
+    <div class="kpi-num" id="kpi-disp">0</div>
+    <div class="kpi-lbl">Ag. Disponibilidade</div>
+  </div>
+  <div class="kpi-chip" style="--c:var(--c-pecas)" onclick="setFilter('AGUARDANDO PEÇAS')" id="chip-pecas">
+    <div class="kpi-num" id="kpi-pecas">0</div>
+    <div class="kpi-lbl">Ag. Peças</div>
+  </div>
+  <div class="kpi-chip" style="--c:var(--c-cliente)" onclick="setFilter('AGUARDANDO CLIENTE')" id="chip-cliente">
+    <div class="kpi-num" id="kpi-cliente">0</div>
+    <div class="kpi-lbl">Ag. Cliente</div>
+  </div>
+  <div class="kpi-chip" style="--c:var(--c-andamento)" onclick="setFilter('ANDAMENTO')" id="chip-andamento">
+    <div class="kpi-num" id="kpi-andamento">0</div>
+    <div class="kpi-lbl">Em Andamento</div>
+  </div>
+  <div class="kpi-chip" style="--c:#ef4444; border-left-color:#ef4444" id="chip-atraso">
+    <div class="kpi-num" style="color:#ef4444" id="kpi-atraso">0</div>
+    <div class="kpi-lbl">Atrasadas</div>
+  </div>
+  <div class="search-wrap">
+    <input class="search-input" type="text" id="search" placeholder="🔍 Buscar cliente, equipamento..." oninput="renderKanban()">
+  </div>
+</div>
+
+<!-- KANBAN -->
+<div class="kanban-wrap">
+  <div class="kanban" id="kanban"></div>
+</div>
+
+<!-- CONFIG -->
+<div class="config-panel" id="config-panel">
+  <button class="config-close" onclick="toggleConfig()">✕</button>
+  <div class="config-title">⚙ Configuração</div>
+  <div class="config-label" style="color:#22c55e;margin-bottom:6px">⚡ Apps Script URL</div>
+  <input class="config-input" id="as-url-input" placeholder="https://script.google.com/macros/s/.../exec" style="border-color:#22c55e">
+  <div style="font-size:10px;color:#6b7280;margin-bottom:14px">Dados em tempo real da planilha</div>
+  <div class="config-label">Nome da Aba</div>
+  <input class="config-input" id="sheet-name-input" value="PENDENCIAS">
+  <button class="config-btn" onclick="applyConfig()">✓ Aplicar e Recarregar</button>
+  <hr class="config-divider">
+  <div class="config-label">Status da Conexão</div>
+  <div class="config-status" id="config-status">Não configurado</div>
+</div>
+
+<script>
+// ═══════════════════════════════════════════
+//  FURNAX — Kanban de Pendências
+// ═══════════════════════════════════════════
+
+const AS_URL_DEFAULT    = 'https://script.google.com/macros/s/AKfycbyFAjWMN4_W5di6uSYlhGKKJibTc59y7dWQqnIUvUeXV_LV8PwHK6cOfZYffEWgNdQ7UQ/exec';
+const SHEET_DEFAULT     = 'PENDENCIAS';
+
+let AS_URL     = AS_URL_DEFAULT;
+let SHEET_NAME = SHEET_DEFAULT;
+let DATA       = [];
+let activeFilter = '';
+
+// Kanban columns definition
+const COLUMNS = [
+  { id: 'AGUARDANDO DISPONIBILIDADE', label: 'Ag. Disponibilidade', color: 'var(--c-disp)'    },
+  { id: 'AGUARDANDO PEÇAS',           label: 'Ag. Peças',           color: 'var(--c-pecas)'   },
+  { id: 'AGUARDANDO CLIENTE',         label: 'Ag. Cliente',         color: 'var(--c-cliente)' },
+  { id: 'ANDAMENTO',                  label: 'Em Andamento',        color: 'var(--c-andamento)'},
+  { id: 'AGENDADO',                   label: 'Agendado',            color: 'var(--c-agendado)' },
+  { id: 'OTHER',                      label: 'Outros',              color: 'var(--c-other)'   },
+];
+
+function getColId(status) {
+  const s = status.toUpperCase().trim();
+  for (const col of COLUMNS) {
+    if (col.id !== 'OTHER' && s.includes(col.id.split(' ')[0]) && s.includes(col.id.split(' ').pop()))
+      return col.id;
+    if (col.id !== 'OTHER' && s === col.id) return col.id;
+  }
+  // Fuzzy match
+  if (s.includes('DISPONIB'))  return 'AGUARDANDO DISPONIBILIDADE';
+  if (s.includes('PEÇA') || s.includes('PECA')) return 'AGUARDANDO PEÇAS';
+  if (s.includes('CLIENTE'))   return 'AGUARDANDO CLIENTE';
+  if (s.includes('ANDAMENTO')) return 'ANDAMENTO';
+  if (s.includes('AGENDADO') || s.includes('AGUARD. DISP') || s.includes('COBRAR')) return 'AGENDADO';
+  return 'OTHER';
+}
+
+function getColColor(status) {
+  const col = COLUMNS.find(c => c.id === getColId(status));
+  return col ? col.color : 'var(--c-other)';
+}
+
+// Date helpers
+function parseDate(s) {
+  if (!s) return null;
+  let m = String(s).match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+  if (m) return new Date(+m[3], +m[2]-1, +m[1]);
+  m = String(s).match(/(\d{4})-(\d{2})-(\d{2})/);
+  if (m) return new Date(+m[1], +m[2]-1, +m[3]);
+  return null;
+}
+function formatDate(d) {
+  if (!d) return null;
+  return d.toLocaleDateString('pt-BR', { day:'2-digit', month:'2-digit', year:'numeric' });
+}
+function diasAtraso(d) {
+  if (!d) return null;
+  const hoje = new Date(); hoje.setHours(0,0,0,0);
+  return Math.floor((hoje - d) / 86400000);
+}
+
+// Load data
+async function loadData() {
+  setNavBadge('Carregando...');
+  try {
+    const url = `${AS_URL}?sheet=${encodeURIComponent(SHEET_NAME)}`;
+    console.log('[Furnax] Fetching:', url);
+    const resp = await fetch(url);
+    const json = await resp.json();
+    console.log('[Furnax] Response:', json.total, 'rows');
+    if (json.error) throw new Error(json.error);
+    if (!json.rows || json.rows.length === 0) throw new Error('Sem dados na aba');
+    DATA = json.rows.map(r => ({ ...r, dateObj: parseDate(r.data) }));
+    const now = new Date().toLocaleTimeString('pt-BR');
+    setNavBadge(`${DATA.length} pendências · ${now}`, true);
+    document.getElementById('config-status').innerHTML =
+      `<span style="color:#22c55e">✓ Conectado · ${DATA.length} registros · ${now}</span>`;
+    renderAll();
+  } catch(err) {
+    console.error('[Furnax]', err);
+    setNavBadge('⚠ Erro: ' + err.message);
+    document.getElementById('config-status').innerHTML =
+      `<span style="color:#ef4444">✗ ${err.message}</span>`;
+  }
+}
+
+function renderAll() { renderKPIs(); renderKanban(); }
+
+function renderKPIs() {
+  const counts = {};
+  COLUMNS.forEach(c => counts[c.id] = 0);
+  let atraso = 0;
+  DATA.forEach(r => {
+    const col = getColId(r.status);
+    counts[col] = (counts[col]||0) + 1;
+    const d = diasAtraso(r.dateObj);
+    if (d !== null && d > 0) atraso++;
+  });
+  document.getElementById('kpi-total').textContent    = DATA.length;
+  document.getElementById('kpi-disp').textContent     = counts['AGUARDANDO DISPONIBILIDADE']||0;
+  document.getElementById('kpi-pecas').textContent    = counts['AGUARDANDO PEÇAS']||0;
+  document.getElementById('kpi-cliente').textContent  = counts['AGUARDANDO CLIENTE']||0;
+  document.getElementById('kpi-andamento').textContent= counts['ANDAMENTO']||0;
+  document.getElementById('kpi-atraso').textContent   = atraso;
+}
+
+function renderKanban() {
+  const search = (document.getElementById('search')?.value || '').toUpperCase();
+
+  let filtered = DATA.filter(r => {
+    if (activeFilter && getColId(r.status) !== activeFilter) return false;
+    if (search && !r.cliente.toUpperCase().includes(search) &&
+        !(r.equip||'').toUpperCase().includes(search) &&
+        !(r.motivo||'').toUpperCase().includes(search)) return false;
+    return true;
+  });
+
+  // Group by column
+  const grouped = {};
+  COLUMNS.forEach(c => grouped[c.id] = []);
+  filtered.forEach(r => {
+    const col = getColId(r.status);
+    grouped[col].push(r);
+  });
+
+  // Sort each column by date
+  COLUMNS.forEach(c => {
+    grouped[c.id].sort((a,b) => {
+      if (!a.dateObj && !b.dateObj) return 0;
+      if (!a.dateObj) return 1;
+      if (!b.dateObj) return -1;
+      return a.dateObj - b.dateObj;
+    });
+  });
+
+  // Only render columns with data (or all if no filter)
+  const visibleCols = activeFilter
+    ? COLUMNS.filter(c => c.id === activeFilter)
+    : COLUMNS.filter(c => grouped[c.id].length > 0);
+
+  const kanban = document.getElementById('kanban');
+  kanban.innerHTML = visibleCols.map(col => {
+    const cards = grouped[col.id];
+    const cardsHtml = cards.length === 0
+      ? '<div class="col-empty">Nenhuma pendência</div>'
+      : cards.map(r => buildCard(r, col.color)).join('');
+
+    return `
+      <div class="column">
+        <div class="col-header" style="--c:${col.color}">
+          <span class="col-title">${col.label}</span>
+          <span class="col-count" style="--c:${col.color}">${cards.length}</span>
+        </div>
+        <div class="col-body">${cardsHtml}</div>
+      </div>`;
+  }).join('');
+}
+
+function buildCard(r, color) {
+  const dias  = diasAtraso(r.dateObj);
+  const late  = dias !== null && dias > 0;
+  const today = dias === 0;
+  const datStr = formatDate(r.dateObj);
+
+  let dateTag = '';
+  if (datStr) {
+    if (today) dateTag = `<span class="card-tag tag-hoje">Hoje</span>`;
+    else if (late) dateTag = `<span class="card-tag tag-atraso">${dias}d atraso</span>`;
+    else if (dias !== null) dateTag = `<span class="card-tag tag-data">em ${Math.abs(dias)}d</span>`;
+  }
+
+  return `
+    <div class="card" style="--c:${color}">
+      <div class="card-cliente">${r.cliente || '—'}</div>
+      ${datStr ? `<div class="card-row">
+        <span class="card-icon">📅</span>
+        <span class="card-val" style="color:${late?'#fca5a5':'var(--muted)'}">${datStr}</span>
+      </div>` : ''}
+      ${r.motivo ? `<div class="card-row">
+        <span class="card-icon">🔖</span>
+        <span class="card-val">${r.motivo}</span>
+      </div>` : ''}
+      ${r.equip ? `<div class="card-row">
+        <span class="card-icon">🔧</span>
+        <span class="card-val">${r.equip}</span>
+      </div>` : ''}
+      ${dateTag ? `<div class="card-tags">${dateTag}</div>` : ''}
+    </div>`;
+}
+
+function setFilter(status) {
+  activeFilter = status;
+  document.querySelectorAll('.kpi-chip').forEach(c => c.classList.remove('active'));
+  const map = {
+    '': 'chip-all',
+    'AGUARDANDO DISPONIBILIDADE': 'chip-disp',
+    'AGUARDANDO PEÇAS': 'chip-pecas',
+    'AGUARDANDO CLIENTE': 'chip-cliente',
+    'ANDAMENTO': 'chip-andamento',
+  };
+  document.getElementById(map[status] || 'chip-all')?.classList.add('active');
+  renderKanban();
+}
+
+function setNavBadge(text, ok = false) {
+  const el = document.getElementById('nav-badge');
+  el.textContent = text;
+  el.className = 'nav-badge' + (ok ? ' ok' : '');
+}
+
+function toggleConfig() { document.getElementById('config-panel').classList.toggle('open'); }
+
+function applyConfig() {
+  const url   = document.getElementById('as-url-input').value.trim();
+  const sheet = document.getElementById('sheet-name-input').value.trim();
+  if (url)   AS_URL     = url;
+  if (sheet) SHEET_NAME = sheet;
+  try {
+    if (url)   localStorage.setItem('furnax_pend_url', url);
+    if (sheet) localStorage.setItem('furnax_pend_sheet', sheet);
+  } catch(e) {}
+  toggleConfig();
+  loadData();
+}
+
+function boot() {
+  document.getElementById('current-date').textContent =
+    new Date().toLocaleDateString('pt-BR', { weekday:'long', day:'2-digit', month:'long' });
+  try {
+    const u = localStorage.getItem('furnax_pend_url');
+    const s = localStorage.getItem('furnax_pend_sheet');
+    if (u) { AS_URL = u; document.getElementById('as-url-input').value = u; }
+    else     document.getElementById('as-url-input').value = AS_URL;
+    if (s && s !== '**PENDENCIAS**') { SHEET_NAME = s; }
+    document.getElementById('sheet-name-input').value = SHEET_NAME;
+    // Fix stale localStorage
+    localStorage.setItem('furnax_pend_sheet', SHEET_NAME);
+  } catch(e) {}
+  loadData();
+  setInterval(loadData, 5 * 60 * 1000);
+}
+
+if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', boot);
+else boot();
+</script>
+</body>
+</html>
